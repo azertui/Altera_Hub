@@ -1,3 +1,17 @@
+# message types:
+# TO_HUB
+# 1 => server update or timeout reply
+# 2 => server closed
+# 3 => list request
+# 4 => server creation request
+# 5 => server created
+# FROM_HUB
+# 1 server list message
+# 2 timeout request
+# 3 server approval
+# 4 server disapproval
+# 5 server added
+
 extends Node
 var server_list = {}
 var server_ttl = {}
@@ -29,8 +43,10 @@ func remove_server(name:String)->void:
 
 func modify_num(ip:String,name:String,num)->void:
 	if server_list.has(name):
-		server_list[name][1]=num
-		build_list()
+		if server_list[name][1]!=num:
+			server_list[name][1]=num
+			build_list()
+		server_ttl[name]=true
 	else:
 # warning-ignore:return_value_discarded
 		add_server(ip,name,num)
@@ -82,7 +98,26 @@ func _process(_delta):
 				paquet.append_array(list)
 				paquet.append(70)
 				socketUDP.put_packet(paquet)
-				
+			4: #ask if server name valid
+				var name =  (raw.subarray(2,1+raw[1])).get_string_from_ascii()
+				var paquet = PoolByteArray()
+				var ip = socketUDP.get_packet_ip()
+				socketUDP.set_dest_address(ip, PORT_CLIENT)
+				if server_list.has(name):
+					paquet.append(4)
+				else:
+					paquet.append(3)
+				socketUDP.put_packet(paquet)
+			5: #server created
+				var name = (raw.subarray(2,1+raw[1])).get_string_from_ascii()
+				var num=raw[2+raw[1]]
+				var ip = socketUDP.get_packet_ip()
+				var paquet = PoolByteArray()
+				if server_list.has(name):
+					paquet.append(3)
+				else:
+					paquet.append(5)
+				socketUDP.put_packet(paquet)
 
 func build_list()->void:
 	list= PoolByteArray()
