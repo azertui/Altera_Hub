@@ -3,11 +3,14 @@ var server_list = {}
 var server_ttl = {}
 var list:PoolByteArray
 var socketUDP = PacketPeerUDP.new()
-const PORT_SERVER=6745
+const PORT_HUB=6745
+const PORT_CLIENT=6744
 onready var itemlist = get_node("ItemList")
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	start_server()
+	add_server("255.255.255.255","test",1)
+	add_server("192.168.1.1","test2",1)
 
 func add_server(ip:String,name:String,num)->bool:
 	if server_list.has(name):
@@ -15,11 +18,13 @@ func add_server(ip:String,name:String,num)->bool:
 	server_list[name]=[ip,num]
 	server_ttl[name]=true
 	append_list(name,[ip,num])
+	itemListUpdate()
 	return true
 
 func remove_server(name:String)->void:
 	server_list.erase(name)	
 	server_ttl.erase(name)
+	itemListUpdate()
 	build_list()
 
 func modify_num(ip:String,name:String,num)->void:
@@ -32,6 +37,7 @@ func modify_num(ip:String,name:String,num)->void:
 
 
 func _on_Timer_timeout() -> void:
+	print("timeout")
 	for server in server_list.keys():
 		request_update(server_list[server][0])
 		if server_ttl[server]==false:
@@ -41,16 +47,16 @@ func _on_Timer_timeout() -> void:
 		itemListUpdate()
 
 func request_update(ip:String)->void:
-	socketUDP.set_dest_address(ip, PORT_SERVER)
+	socketUDP.set_dest_address(ip, PORT_CLIENT)
 	var pac = PoolByteArray()
 	pac.append(2)
 	socketUDP.put_packet(pac)
 
 func start_server():
-	if (socketUDP.listen(PORT_SERVER) != OK):
-		printt("Error listening on port: " + str(PORT_SERVER))
+	if (socketUDP.listen(PORT_HUB) != OK):
+		printt("Error listening on port: " + str(PORT_HUB))
 	else:
-		printt("Listening on port: " + str(PORT_SERVER))
+		printt("Listening on port: " + str(PORT_HUB))
 
 func _exit_tree():
 	socketUDP.close()
@@ -69,8 +75,13 @@ func _process(_delta):
 				remove_server(socketUDP.get_packet_ip())
 			3: #ask list
 				var ip = socketUDP.get_packet_ip()
-				socketUDP.set_dest_address(ip, PORT_SERVER)
-				socketUDP.put_packet(list)
+				socketUDP.set_dest_address(ip, PORT_CLIENT)
+				print("sending list to "+ip+" "+str(PORT_CLIENT))
+				var paquet = PoolByteArray()
+				paquet.append(1)
+				paquet.append_array(list)
+				paquet.append(70)
+				socketUDP.put_packet(paquet)
 				
 
 func build_list()->void:
@@ -90,4 +101,4 @@ func append_list(name:String,params:Array)->void:
 func itemListUpdate()->void:
 	itemlist.clear()
 	for server in server_list.keys():
-		itemlist.add_item("["+str(server_list[server][1]+"] "+server),null,false)
+		itemlist.add_item("["+str(server_list[server][1])+"] "+server,null,false)
