@@ -81,6 +81,7 @@ func _exit_tree():
 func _process(_delta):
 	while socketUDP.get_available_packet_count()>0:
 		var raw = socketUDP.get_packet()
+		print("got paquet of type "+str(raw[0]))
 		match raw[0]:
 			1: # name + num
 				var name = (raw.subarray(2,1+raw[1])).get_string_from_ascii()
@@ -88,7 +89,8 @@ func _process(_delta):
 				var ip = socketUDP.get_packet_ip()
 				modify_num(ip,name,num)
 			2: #close
-				remove_server(socketUDP.get_packet_ip())
+				var name = (raw.subarray(2,1+raw[1])).get_string_from_ascii()
+				remove_server(name)
 			3: #ask list
 				var ip = socketUDP.get_packet_ip()
 				socketUDP.set_dest_address(ip, PORT_CLIENT)
@@ -118,6 +120,7 @@ func _process(_delta):
 				else:
 					paquet.append(5)
 				socketUDP.put_packet(paquet)
+				add_server(ip,name,num)
 
 func build_list()->void:
 	list= PoolByteArray()
